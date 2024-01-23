@@ -114,7 +114,7 @@ async function main() {
     "audit.fvdl"
   );
   const hasBlockingIssues =
-    numberOfCriticalSevIssues > 0 || numberOfHighSevIssues > 0;
+    numberOfCriticalSevIssues > 0 || numberOfHighSevIssues > 0 || numberOfMediumSevIssues > 0;
   console.log(
     `Scan complete, number of info severity issues: ${numberOfInfoSevIssues}, number of low severity issues: ${numberOfLowSevIssues}, number of medium severity issues: ${numberOfMediumSevIssues}, number of high severity issues: ${numberOfHighSevIssues}, number of critical severity issues: ${numberOfCriticalSevIssues}`
   );
