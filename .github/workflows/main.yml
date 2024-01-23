@@ -39,8 +39,7 @@ jobs:
       - name: Download Fortify uploader CLI
         run: |
           wget https://github.com/fod-dev/fod-uploader-java/releases/download/v5.4.0/FodUpload.jar -O /opt/FodUpload.jar
-        shell: bash -l {0}
-
+          
       - name: Run Fortify SAST scan
         run: |
           dotnet build
@@ -58,10 +57,16 @@ jobs:
           SCAN_ID=$(echo "$UPLOAD_OUTPUT" | sed -n 's/Scan \([0-9]*\).*$/\1/p')
 
           FORTIFY_USER=${{ secrets.FORTIFY_USER }} FORTIFY_TOKEN=${{ secrets.FORTIFY_TOKEN }} FORTIFY_TENANT=${{ secrets.FORTIFY_TENANT }} node .github/scripts/fortify-wait-fpr.js "$SCAN_ID"
-
-        shell: bash -l {0}
+          
+      - name: Archive fpr
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: fpr
+          path: scandata.fpr
 
       - name: Run Mobb on the findings and get fixes
+        if: always()
         uses: mobb-dev/action/review@v1.1
         with:
           report-file: "scandata.fpr"
