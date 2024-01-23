@@ -1,63 +1,76 @@
-on: [pull_request]
+# Mobb/Fortify Fixer on pull requests
+# This workflow defines the needed steps to run Fortify on every pull request and pass the results to Mobb Fixer.
+#
+# Secrets in use (add your missing ones):
+# FORTIFY_USER - your Fortify username
+# FORTIFY_TENANT - your Fortify tenant name
+# FORTIFY_API_TOKEN - your Fortify access token
+# FORTIFY_RELEASE_ID - your Fortify app's release-id (number)
+# MOBB_API_TOKEN - your mobb user credentials (autumatially set if you forked this repo via the Mobb app)
+# GITHUB_TOKEN - automatically set by GitHub
 
-permissions:
-  contents: read
-  checks: write
-  actions: write
-  statuses: write
+name: "Mobb/Fortify"
+
+on:
+  pull_request:
+    branches: ["*"]
 
 jobs:
-  Fortify-Mobb-example:
-    runs-on: ubuntu-latest
-    name: Run scan with Fortify and get automated fixes with Mobb
+  scan-and-fix:
+    name: Scan with Fortify and fix with Mobb
+    runs-on: 'ubuntu-latest'
+    timeout-minutes: 360
+    permissions:
+      pull-requests: write
+      statuses: write
 
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sed
-        shell: bash -l {0}
-
-      - name: Checkout repo to get code
-        uses: actions/checkout@v3
-
-      - name: Setup Node on this machine
-        uses: actions/setup-node@v3.6.0
-        with:
-          node-version: 18
-
-      - uses: actions/setup-dotnet@v3
-        with:
-          dotnet-version: "7.0.100"
-
       - name: Setup Java on this machine
         uses: actions/setup-java@v3
         with:
           distribution: "oracle"
           java-version: "19"
+      - name: Setup Maven on this machine
+        uses: stCarolas/setup-maven@v4.5
+        with:
+          maven-version: 3.8.6
+      - name: Setup Node on this machine
+        uses: actions/setup-node@v3.6.0
+        with:
+          node-version: 18
+      - name: Install sed
+        run: sudo apt-get update && sudo apt-get install -y sed
+
+      - name: Checkout repo to get code
+        uses: actions/checkout@v3
 
       - name: Download Fortify uploader CLI
         run: |
-          wget https://github.com/fod-dev/fod-uploader-java/releases/download/v5.4.0/FodUpload.jar -O /opt/FodUpload.jar
-          
+          wget https://tools.fortify.com/scancentral/Fortify_ScanCentral_Client_21.2.0_x64.zip -O fcs.zip
+          unzip fcs.zip
+          chmod +x bin/scancentral
+          wget https://github.com/fod-dev/fod-uploader-java/releases/download/v5.4.0/FodUpload.jar -O FodUpload.jar
+  
+      - uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: "7.0.100"
+      
       - name: Run Fortify SAST scan
         run: |
           dotnet build
           zip -r fortify_package.zip *
-
-          UPLOAD_OUTPUT=$(java -jar /opt/FodUpload.jar \
+          
+          UPLOAD_OUTPUT=$(java -jar FodUpload.jar \
             -z fortify_package.zip \
             -ep SingleScanOnly \
             -portalurl https://ams.fortify.com/ \
             -apiurl https://api.ams.fortify.com/ \
-            -userCredentials ${{ secrets.FORTIFY_USER }} ${{ secrets.FORTIFY_TOKEN }} \
+            -userCredentials ${{ secrets.FORTIFY_USER }} ${{ secrets.FORTIFY_API_TOKEN }} \
             -tenantCode ${{ secrets.FORTIFY_TENANT }} \
             -releaseId ${{ secrets.FORTIFY_RELEASE_ID }} \
             -pp Queue)
           SCAN_ID=$(echo "$UPLOAD_OUTPUT" | sed -n 's/Scan \([0-9]*\).*$/\1/p')
-
-          FORTIFY_USER=${{ secrets.FORTIFY_USER }} FORTIFY_TOKEN=${{ secrets.FORTIFY_TOKEN }} FORTIFY_TENANT=${{ secrets.FORTIFY_TENANT }} node .github/scripts/fortify-wait-fpr.js "$SCAN_ID"
-          
+          FORTIFY_USER=${{ secrets.FORTIFY_USER }} FORTIFY_API_TOKEN=${{ secrets.FORTIFY_API_TOKEN }} FORTIFY_TENANT=${{ secrets.FORTIFY_TENANT }} node .github/scripts/fortify-wait-fpr.js "$SCAN_ID"
       - name: Archive fpr
         if: always()
         uses: actions/upload-artifact@v3
