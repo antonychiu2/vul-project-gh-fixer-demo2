@@ -62,7 +62,7 @@ jobs:
         shell: bash -l {0}
 
       - name: Run Mobb on the findings and get fixes
-        uses: mobb-dev/action@v1
+        uses: mobb-dev/action/review@v1.1
         with:
           report-file: "scandata.fpr"
           api-key: ${{ secrets.MOBB_API_TOKEN }}
